@@ -7,7 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <tchar.h>
-
+#include <windows.h>
+#include <windowsx.h>
 
 GLUquadricObj* quad;
 //just for now!!! make it globally just for the sake of simplicity
@@ -159,6 +160,8 @@ int _tmain() //used this because it can trasnlate to either main() or wmain()
 					break;
 				case SDLK_y:
 					break;
+				case SDLK_SPACE:
+					break; 
 				}
 				break;
 			case SDL_KEYUP:
@@ -176,6 +179,17 @@ int _tmain() //used this because it can trasnlate to either main() or wmain()
 		if(1000.0/60 >SDL_GetTicks()-start)
 			SDL_Delay(1000.0/60 - (SDL_GetTicks() - start));
 	}
+
+	//render all the bodies
+	for(int i=0;i<bodies.size();i++){
+		world->removeCollisionObject(bodies[i]);
+		btMotionState* motionState = bodies[i]->getMotionState();
+		btCollisionShape* shape = bodies[i]->getCollisionShape();//due their dynamical allocation
+		delete bodies[i];
+		delete shape;
+		delete motionState;
+	}
+
 	delete dispatcher;
 	delete collisionconfig;
 	delete solver;
