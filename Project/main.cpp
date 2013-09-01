@@ -34,6 +34,11 @@ int main(int argc,char** argv)
 	MultipleObjects ccdDemo;
 	//ccdDemo.initPhysics();
 	ccdDemo.Interface();
+	//ccdDemo.RNNConnection(4);
+	//ccdDemo.SimpsonsRule(6,0,0.2);
+	//ccdDemo.Training();
+
+	//ccdDemo.Initialization(0,1);
 
 
 #ifdef CHECK_MEMORY_LEAKS

@@ -9,7 +9,7 @@
  * Basic.cpp
  *
  *  Created on: Aug 5, 2013
- *      Author: marium
+ *      Author: Marium Zeeshan
  */
 
 ///create 125 (5x5x5) dynamic object
@@ -38,12 +38,26 @@
 #include "GLDebugDrawer.h"
 
 #include <iostream>
-#include <stdlib.h>
+//#include <stdlib.h>
 
 static GLDebugDrawer gDebugDraw;
 
-static double timeStep = 0.0;
+static double timeStep = 0.0; //do it inside the constructor
 
+//for the normal distribution generation
+typedef std::tr1::ranlux64_base_01 Engine;
+//typedef std::tr1::mt19937 Engine;
+typedef std::tr1::normal_distribution<double> Distribution;
+
+Engine myEngine;
+
+
+
+
+
+/*
+ * For displaying anything on console
+ */
 
 void MultipleObjects::clientMoveAndDisplay()
 {
@@ -119,6 +133,11 @@ void MultipleObjects::clientMoveAndDisplay()
 
 }
 
+void MultipleObjects::setGravity(double y){
+	m_dynamicsWorld->setGravity(btVector3(0,-y,0));
+
+}
+
 void MultipleObjects::getResults(std::vector<std::pair<btRigidBody*,btTransform> > _massInformation){
 	/*for (int i=0 ; i<300 ; i++) {
 		m_dynamicsWorld->stepSimulation(1/60.f,10);
@@ -132,17 +151,29 @@ void MultipleObjects::getResults(std::vector<std::pair<btRigidBody*,btTransform>
 
 }
 
+
+/*
+ * This is used to set Simulation time
+ */
+
 void MultipleObjects::setSimulationTime(double _time){
-	time = _time;
-	timeStep = time;
+	_timeStep = _time;
+	timeStep = _timeStep;
 
 }
+
+/*
+ * This is used to get Simulation time
+ */
 
 double MultipleObjects::getSimulationTime(void){
-	time = timeStep;
-	return time;
+	_timeStep = timeStep;
+	return _timeStep;
 }
 
+/*
+ * For displaying anything on graphical window
+ */
 void MultipleObjects::displayCallback(void) {
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -156,6 +187,114 @@ void MultipleObjects::displayCallback(void) {
 	glFlush();
 	swapBuffers();
 }
+
+/*
+ * This is used to get origin of Ground
+ */
+
+Triplet MultipleObjects::getGroundDimensions(){
+	return _groundDimensions;
+
+}
+
+/*
+ * This is used to set origin of Ground
+ */
+
+Triplet MultipleObjects::getGroundOrigin(){
+	return _groundOrigin;
+
+}
+
+/*
+ * This is used to get the range of normal distribution
+ */
+
+std::pair<double,double> MultipleObjects::getDistributionRange(){
+	return std::make_pair(distMin_,distMax_);
+}
+
+/*
+ * This is used to set the range of normal distribution
+ */
+void MultipleObjects::setDistributionRange(double min_,double max_){
+	distMin_ = min_;
+	distMax_ = max_;
+
+}
+
+/*
+ * Helping function used by initialization
+ */
+double random_normal(Engine &eng, Distribution dist) {
+    return dist(eng);
+}
+
+/*
+ * This function is used to initialize masses and their positions on the basis of gaussian normal distribution
+ * @param : min = min value of the distribution
+ * @param : max = max value of the distribution
+ */
+
+std::pair<btRigidBody*,btTransform> MultipleObjects::Initialization(double min,double max){
+
+/*
+	Engine myEngine;
+	myEngine.seed((unsigned int) time(NULL)); //initializing generator to January 1, 1970
+*/
+	Distribution myDist(min,max);
+
+	//To place them on plane
+	//Taking it half because box is placed on the origin symmetrically
+	Distribution CoX(getGroundOrigin().x_/2.0,getGroundDimensions().x_/2.0);
+	Distribution CoY(getGroundOrigin().y_/2.0,getGroundDimensions().y_/2.0);
+	Distribution CoZ(getGroundOrigin().z_/2.0,getGroundDimensions().z_/2.0);
+
+	double mass,x,y,z;
+	std::string fixed,activate,connection;
+
+	myDist.reset(); //cleans cache values
+
+	// For true false random assignment
+	static std::string charset = "f";
+
+	mass = fabs(random_normal(myEngine,myDist));
+
+	//for specifying position coordinates
+	x = random_normal(myEngine,CoX);
+	y = random_normal(myEngine,CoY);
+	z = random_normal(myEngine,CoZ);
+
+	fixed = charset[rand() % charset.length()];
+	activate = charset[rand() % charset.length()];
+
+	bool fixedMass,activateMass;
+
+			{
+			if(fixed == "t")
+				fixedMass = true;
+			else
+				fixedMass = false;
+
+			if(activate == "t")
+				activateMass = true;
+			else
+				activateMass = false;
+			}
+	//std::cout<<fixedMass<<" fixy"<<fixed<<std::endl;
+	std::pair<btRigidBody*,btTransform> newMass = addMass(x,y,z,mass,fixedMass,activateMass);
+
+	//std::cout<< "fiixed"<<fixed<<std::endl;
+
+	//std::cout << "a random value == " << fabs(random_normal(myEngine,myDist)) << std::endl;
+	//std::cout << myDist(myEngine) << std::endl;
+
+	std::cout<< "Mass No = "<< masses.size()-1 << ": \t Mass = " << mass <<"\t Position = ("<<x<<","<<y<<","<<z<<")"<<std::endl;
+	std::cout<<"@@"<<newMass.first->getOrientation();
+	return newMass;
+
+}
+
 
 /*btRigidBody* addSphereShape(float rad,float x,float y,float z,float mass){
 	//add static objects
@@ -180,8 +319,38 @@ return body;
 }
 */
 
+/*
+ * This function is used to set ground origin
+ * @param : x = x coordinate
+ * @param : y = y coordinate
+ * @param : z = z coordinate
+ */
+void MultipleObjects::setGroundOrigin(double _x,double _y,double _z){
+	_groundOrigin.x_ = _x;
+	_groundOrigin.y_ = _y;
+	_groundOrigin.z_ = _z;
+
+}
+
+/*
+ * This function is used to get ground origin
+ * @param : x = x coordinate
+ * @param : y = y coordinate
+ * @param : z = z coordinate
+ */
+
+void MultipleObjects::setGroundDimensions(double _x,double _y,double _z){
+	_groundDimensions.x_ = _x;
+	_groundDimensions.y_ = _y;
+	_groundDimensions.z_ = _z;
+
+}
+
+/*
+ * This function is used to add ground into the simulation
+ */
 void MultipleObjects::addGround(){
-	btBoxShape* groundShape = new btBoxShape(btVector3(btScalar(60.),btScalar(60.),btScalar(60.)));
+	btBoxShape* groundShape = new btBoxShape(btVector3(btScalar(_groundDimensions.x_),btScalar(_groundDimensions.y_),btScalar(_groundDimensions.z_)));
 	groundShape->initializePolyhedralFeatures();
 	//	btCollisionShape* groundShape = new btStaticPlaneShape(btVector3(0,1,0),50);
 
@@ -189,7 +358,7 @@ void MultipleObjects::addGround(){
 
 	btTransform groundTransform;
 	groundTransform.setIdentity();
-	groundTransform.setOrigin(btVector3(0,-50,0));
+	groundTransform.setOrigin(btVector3(btScalar(_groundOrigin.x_),btScalar(_groundOrigin.y_),btScalar(_groundOrigin.z_)));
 
 
 	{
@@ -210,6 +379,10 @@ void MultipleObjects::addGround(){
 
 		body->setGravity(btVector3(0,-9.81,0));
 
+		//TODO
+		//place body on the ground always...play with ERP values
+		//http://www.bulletphysics.org/Bullet/phpBB3/viewtopic.php?f=9&t=5393&view=next
+
 		//add the body to the dynamics world
 		m_dynamicsWorld->addRigidBody(body);
 
@@ -217,6 +390,9 @@ void MultipleObjects::addGround(){
 
 }
 
+/*
+ * This function is REDUNDANT
+ */
 
 void	MultipleObjects::initPhysics()
 {
@@ -405,6 +581,16 @@ void	MultipleObjects::initPhysics()
 
 }
 
+/*
+ * This function is used to add masses
+ * @param : x = position of x coordinate
+ * @param : y = position of y coordinate
+ * @param : z = position of z coordinate
+ * @param : radius = radius of mass
+ * @param : fixed = mass is fixed or not
+ * @param : activate = mass is activate or not into the simulation
+ */
+
 std::pair <btRigidBody*,btTransform> MultipleObjects::addMass(double x,double y,double z,double radius,bool fixed,bool activate){
 	//Adding sphere as mass
 	btSphereShape* sphere = new btSphereShape(radius);
@@ -430,9 +616,10 @@ std::pair <btRigidBody*,btTransform> MultipleObjects::addMass(double x,double y,
 	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass,myMotionState,sphere,localInertia);
 	btRigidBody* body = new btRigidBody(rbInfo);
 
-	body->setRestitution(btScalar(1));//set as elastic
+	//body->setRestitution(btScalar(1));//set as elastic
 	if (activate)
-		activate = DISABLE_DEACTIVATION;
+		//activate = DISABLE_DEACTIVATION;
+		activate = ACTIVE_TAG;
 
 	body->activate(activate);
 
@@ -442,17 +629,26 @@ std::pair <btRigidBody*,btTransform> MultipleObjects::addMass(double x,double y,
 
 }
 
+/*
+ * This is used to add Spring constraint
+ * @param : body1 = one side of the spring
+ * @param : body2 = other side of the spring
+ * @param : t1 = transform of body1
+ * @param : t2 = transform of body2
+ */
 
-void MultipleObjects::addConstraint(btRigidBody* body1,btTransform t1,btRigidBody* body2,btTransform t2){
+void MultipleObjects::addSpringConstraint(btRigidBody* body1,btTransform t1,btRigidBody* body2,btTransform t2){
 	btGeneric6DofSpringConstraint* pGen6DOFSpring = new btGeneric6DofSpringConstraint(*body1, *body2, t1, t2,true);
-	pGen6DOFSpring->setLinearUpperLimit(btVector3(5., 0., 0.));
-	pGen6DOFSpring->setLinearLowerLimit(btVector3(-5., 0., 0.));
 
-	pGen6DOFSpring->setAngularLowerLimit(btVector3(0.f, 0.f, -1.5f));
-	pGen6DOFSpring->setAngularUpperLimit(btVector3(0.f, 0.f, 1.5f));
+	pGen6DOFSpring->setLinearUpperLimit(upperLimitofSpring);
+	pGen6DOFSpring->setLinearLowerLimit(lowerLimitofSpring);
+
+	pGen6DOFSpring->setAngularLowerLimit(lowerAngularLimit);
+	pGen6DOFSpring->setAngularUpperLimit(upperAngularLimit);
 
 	pGen6DOFSpring->setDbgDrawSize(btScalar(5.f));
 
+	//Setting different values of Spring coefficients on different points of the Spring
 	pGen6DOFSpring->enableSpring(0, true);
 	pGen6DOFSpring->setStiffness(0, 39.478f);
 	pGen6DOFSpring->setDamping(0, 0.5f);
@@ -461,11 +657,50 @@ void MultipleObjects::addConstraint(btRigidBody* body1,btTransform t1,btRigidBod
 	pGen6DOFSpring->setDamping(0, 0.3f);
 	pGen6DOFSpring->setEquilibriumPoint();
 
+	//to get the position of the spring
+	//btVector3 currentLinearDiff = pGen6DOFSpring->getTranslationalLimitMotor()->m_currentLinearDiff;
+
+	/*setting ERP and CFM
+	 *INFO: index 0-2 are for linear constraints, 3-5 for angular constraints
+	 *If ERP=0 then no correcting force is applied and the bodies will eventually drift apart as the simulation proceeds.
+	 *If ERP=1 then the simulation will attempt to fix all joint error during the next time step.
+	 *
+	 *If CFM is set to zero, the constraint will be hard.
+	 *If CFM is set to a positive value, it will be possible to violate the constraint by "pushing on it"
+
+	 *SYNTAX: constraint->setParam(BT_CONSTRAINT_STOP_CFM, myCFMvalue, index)
+	 */
+
+	pGen6DOFSpring->setParam(BT_CONSTRAINT_STOP_CFM, 0, 1);
+	pGen6DOFSpring->setParam(BT_CONSTRAINT_STOP_ERP, 0.3,1);
+
+
 	m_dynamicsWorld->addConstraint(pGen6DOFSpring, true);
 
 }
 
+void MultipleObjects::setUpperLimitofSpring(btVector3 _uplimspring){
+	upperLimitofSpring = _uplimspring;
+}
 
+void MultipleObjects::setLowerAngularLimitofSpring(btVector3 _lowlimspring){
+	lowerLimitofSpring = _lowlimspring;
+
+}
+
+void MultipleObjects::setUpperAngularLimitofSpring(btVector3 _uplimspring){
+	upperAngularLimit = _uplimspring;
+}
+
+void MultipleObjects::setLowerLimitofSpring(btVector3 _lowlimspring){
+	lowerAngularLimit = _lowlimspring;
+
+}
+
+
+/*
+ * This is the main program from where all the processing starts
+ */
 void MultipleObjects::Interface(){
 	setTexturing(true);
 	setShadows(true);
@@ -493,20 +728,65 @@ void MultipleObjects::Interface(){
 	//Opening file
 	myfile.open("MassPositions.csv");
 
-	addGround();
-// Entering the data
+	std::string groundAddition;
+
+	std::cout<<"Do you want Ground in simulation(t/f)?"<<std::endl;
+	std::cin >> groundAddition;
+
+	if(groundAddition == "t")
+		addGround();
+
 
 	int NumberofMasses;
 	std::cout<< "Enter number of masses"<<std::endl;
 	std::cin>>NumberofMasses;
 
+	// Setting the flag for String random selection!!
+	srand(time(NULL));
+	myEngine.seed((unsigned int) time(NULL)); //initializing generator to January 1, 1970
 
+	int connectionType;
+
+	if(NumberofMasses>1){
+			while(true)
+				{
+				std::cout<< "Which type of connection do you want?\n"
+							"Select the number:\n"
+							"=====================================\n"
+							"1.FeedForward Mass Spring Connection \n"
+							"2. Recurrent Mass Spring Connection  \n"
+							"3. Connection of your own \n"
+						<<std::endl;
+
+				std::cin>>connectionType;
+
+				if(connectionType == 1)
+					{
+					FeedForwardMassSpringConnection(NumberofMasses);
+
+					break;
+					}
+				else if(connectionType == 2)
+					{
+					RNNConnection(NumberofMasses);
+					break;
+					}
+				else if (connectionType == 3)
+					{
+					FreeMassSpringConnection(NumberofMasses);
+					break;
+					}
+				else
+					std::cout<<"Try Again!!"<<std::endl;
+				}
+
+/*
 	double mass,x,y,z;
 	std::string fixed,activate,connection;
 
 	for(int i = 0;i<NumberofMasses;i++){
 
-		std::cout<<"Enter mass value of mass "<<i<<std::endl;
+		/*std::cout<<"Enter mass value of mass "<<i<<std::endl;
 		std::cin>>mass;
 		//std::cout<<<<masses.size()<<std::endl;
 		std::cout<<"Enter x coordinate value of mass "<<i<<std::endl;
@@ -535,12 +815,51 @@ void MultipleObjects::Interface(){
 		}
 
 		std::pair<btRigidBody*,btTransform> Latest = addMass(x,y,z,mass,fixedMass,activateMass);
+		*/
+/*		std::pair<btRigidBody*,btTransform> Latest = Initialization(getDistributionRange().first,getDistributionRange().second); //min and max of distribution
+
+		bool connectionSpring;
+
 		myfile<<"Mass Number "<<i<<","<<","<<",";
 
 		m_dynamicsWorld->addRigidBody(Latest.first);
 
+		int connectionType;
+
 		if(masses.size()>1){
-			std::cout<<"Do you want to connect this mass to any other previous mass(true/false)"<<std::endl;
+			while(true)
+				{
+				std::cout<< "Which type of connection do you want?\n"
+							"Select the number:\n"
+							"=====================================\n"
+							"1.FeedForward Mass Spring Connection \n"
+							"2. Recurrent Mass Spring Connection  \n"
+							"3. Connection of your own \n"
+						<<std::endl;
+
+				std::cin>>connectionType;
+
+				if(connectionType == 1)
+					{
+					FeedForwardConnection(NumberofMasses);
+
+					break;
+					}
+				else if(connectionType == 2)
+					{
+					RNNConnection();
+					break;
+					}
+				else if (connectionType == 3)
+					{
+					FreeConnection(i,Latest);
+					break;
+					}
+				else
+					std::cout<<"Try Again!!"<<std::endl;
+				}
+*/
+/*			std::cout<<"Do you want to connect mass "<<i<<" to any other previous mass(true/false)"<<std::endl;
 			std::cin>>connection;
 
 			if(connection == "t")
@@ -551,10 +870,269 @@ void MultipleObjects::Interface(){
 			if(connectionSpring){
 				addConnection(Latest);
 			}
-		}
+			*/
+//		}
 	}
+	//myfile<<std::endl;
+
+}
+
+
+/*
+ * This function is used to provide RNN connection among masses
+ */
+void MultipleObjects::RNNConnection(int NumberofMasses){
+	for(int i=0;i<NumberofMasses;i++){
+		std::pair<btRigidBody*,btTransform> NewMass = Initialization(getDistributionRange().first,getDistributionRange().second); //min and max of distribution
+		myfile<<"Mass Number "<<i<<","<<","<<",";
+		m_dynamicsWorld->addRigidBody(NewMass.first);
+
+		for(int j=0;j<i;j++){
+			if(masses.size()>1){
+				//Do connection for all masses that were before
+				addSpringConstraint(NewMass.first,NewMass.second,masses[j].first,masses[j].second);
+				}
+			}
+		}
+
 	myfile<<std::endl;
 }
+
+/*
+ * This function is used to do free connection inside mass spring system
+ */
+void MultipleObjects::FreeMassSpringConnection(int NumberofMasses){
+		for(int i = 0;i<NumberofMasses;i++){
+			std::pair<btRigidBody*,btTransform> Latest = Initialization(getDistributionRange().first,getDistributionRange().second); //min and max of distribution
+
+			myfile<<"Mass Number "<<i<<","<<","<<",";
+			m_dynamicsWorld->addRigidBody(Latest.first);
+			if (masses.size()>1)
+				FreeConnection(i,Latest);
+
+		}
+		myfile<<std::endl;
+
+}
+
+/*
+ * This is used by FreeMassSpringConnection
+ */
+void MultipleObjects::FreeConnection(int _i,std::pair<btRigidBody*,btTransform> _Latest)
+{
+	std::string connection;
+	bool connectionSpring;
+
+	std::cout<<"Do you want to connect mass "<<_i<<" to any other previous mass(true/false)"<<std::endl;
+	std::cin>>connection;
+
+	if(connection == "t")
+		connectionSpring = true;
+	else
+		connectionSpring = false;
+	if(connectionSpring){
+		addConnection(_Latest);
+	}
+
+}
+
+/*
+ * This is used for nonlinear combination of the first mass spring model
+ * It is sigmoidal in nature
+ */
+void MultipleObjects::ANN(int NoOfHiddenNeuronsinEachLayer,int NoOfLayers,int NoOfOutputNeurons,int NoOfInputNeurons){
+	//BackPropagation* bpg = new BackPropagation(NoOfLayers,NoOfOutputNeurons,NoOfInputNeurons,NoOfHiddenNeuronsinEachLayer);
+
+
+
+
+
+
+
+}
+
+/*
+ * This is used to generate Random float numbers
+ * @param : a = min value for selection
+ * @param : b = max value for selection
+ */
+double RandomFloat(float a, float b) {
+    float random = ((float) rand()) / (float) RAND_MAX;
+    float diff = b - a;
+    float r = random * diff;
+    return a + r;
+}
+
+/*
+ * This is used to compute Integration of Volterra Series
+ *  @param : n = number of intervals
+ *  @param : minIntegral = lower limit
+ *  @param : maxIntegral = upper limit
+ */
+/*void MultipleObjects::SimpsonsRule(double n,double minIntegral,double maxIntegral){
+	//TODO
+	//Function is left
+
+	double delta_x = (maxIntegral-minIntegral)/n;
+	std::vector<double> interval;
+	double temp = minIntegral;
+
+	double sum;
+
+	//storing value of the interval
+	for(int i=0;i<=n;i++){
+		interval.push_back(temp);
+		temp += delta_x;
+	}
+	int t=0; //used for handling index of intervals
+
+	//Calculating values of each function step
+	// f(xo),f(x1),f(x2)....
+
+	sum += Function(interval[t]); //for zero interval
+
+	for(int i=1;i<n;i++)
+	{
+		int flag = 0;
+
+
+		if(flag ==0){
+			sum = sum + 4 * Function(interval[++t]);
+			flag=1;
+		}
+	else{
+		sum = sum + 2 * Function(interval[++t]);
+		flag = 0;
+
+		}
+	}
+	 sum = sum + Function(interval[++t]); // for last interval
+	 sum = sum * (delta_x/3);
+	 printf("\n\n  I = %f  ",sum);
+
+
+
+	/*for(int i=0;i<interval.size();i++){
+		std::cout<<interval[i]<<std::endl;
+	}*/
+
+//}
+
+//TODO
+//_springNeutralLength = get the initial linear position as the form of equilibrium position
+btScalar MultipleObjects::LinearForceOfSpring(double _springCurrentLength,double _springNeutralLength,double springStiffness){
+	//Implementing Hooke's Law
+	btScalar linearForce = -springStiffness * fabs(_springCurrentLength - _springNeutralLength);
+	return linearForce;
+}
+
+void MultipleObjects::NonLinearForceOfSpring(void){
+
+
+}
+
+/*
+ * This is the function used to compute Volterra series
+ */
+//TODO
+//This volterra function implementation is left
+void MultipleObjects::Function(double index){
+
+}
+
+/*
+ * This is used for computing Volterra series of first mass spring model
+ */
+void MultipleObjects::VolterraSeries(void){
+	//Memory for Volterra Series
+	std::vector<int> Memory;
+
+	//implementing equation 2 of paper 1
+	double y;
+	double tou1 = RandomFloat(0,0.2),tou2 = RandomFloat(0,0.2);;
+	double u1 = 0.1, u2 = 0.1;
+	double sigma1 = 0.05 ,sigma2 = 0.05;
+	//	Function
+	double h2 = exp(pow((tou1 - u1),2)/(2*pow(sigma1,2))) + exp(pow((tou2 - u2),2)/(2*pow(sigma2,2)));
+
+
+	//std::cout<<h2<<std::endl;
+
+
+
+}
+/*
+ * This is used for providing connection in FeedForward Fashion
+ */
+void MultipleObjects::FeedForwardMassSpringConnection(int NoOfMasses){
+	for (int i=0;i<NoOfMasses;i++){
+		std::pair<btRigidBody*,btTransform> Latest = Initialization(getDistributionRange().first,getDistributionRange().second); //min and max of distribution
+		myfile<<"Mass Number "<<i<<","<<","<<",";
+		m_dynamicsWorld->addRigidBody(Latest.first);
+
+		//to make the motion horizontal
+		setLowerAngularLimitofSpring(btVector3(0,0,0));
+		setUpperAngularLimitofSpring(btVector3(0,0,0));
+		//TODO
+		//Do check for lower and upper limit as well but I don't think so. but do check
+		/*
+		 * For each axis, if
+		 *
+		 * lower limit = upper limit
+		 * The axis is locked
+		 *
+		 * lower limit < upper limit
+		 * The axis is limited between the specified values
+		 *
+		 * lower limit > upper limit
+		 * The axis is free and has no limits
+		 */
+
+		//TODO
+		//It is left to implement!! Suggestion: to use btCompoundShape or use Yann's reply
+		//http://bulletphysics.org/Bullet/phpBB3/viewtopic.php?f=9&t=6792
+
+
+		//addSpringConstraint(Latest.first,Latest.second);
+
+
+	}
+}
+
+
+/*
+ * This function is used to apply feedforward connection
+ */
+void MultipleObjects::FeedForwardConnection(void){
+
+}
+
+/*
+ * This function is used to apply linear force on the mass spring system
+ */
+void MultipleObjects::ApplyLinearForce(){
+
+}
+
+/*
+ * This function is used to apply nonlinear force on the mass spring system
+ */
+void MultipleObjects::ApplyNonlinearForce(void){
+
+}
+
+/*
+ * This is mainly used for the training purposes
+ */
+void MultipleObjects::Training(void){
+
+
+
+
+
+
+}
+
 /*
  * This function is used to connect one mass to another via spring connection
  */
@@ -571,11 +1149,16 @@ void MultipleObjects::addConnection(std::pair<btRigidBody*,btTransform> MassTran
 		selection = false;
 
 */
+
+
+	/*
+	 * Free Connection Code
+	 */
 	int massNo;
-	bool connection = true;
+	bool connection3 = true;
 
 	//if(selection){
-		while(connection == true){
+		while(connection3 == true){
 
 			std::cout<<"Enter mass number which you wanted to connect with this mass"<<std::endl;
 			std::cin>>massNo;
@@ -586,16 +1169,16 @@ void MultipleObjects::addConnection(std::pair<btRigidBody*,btTransform> MassTran
 				std::cout<<"This mass does not exist, Try again"<<std::endl;
 				continue;
 			}
-			addConstraint(MassTransformPair.first,MassTransformPair.second,masses[massNo].first,masses[massNo].second);
+			addSpringConstraint(MassTransformPair.first,MassTransformPair.second,masses[massNo].first,masses[massNo].second);
 
 
 			std::cout<<"Do you want more connections t/f"<<std::endl;
 			std::cin>>multiple;
 
 			if(multiple == "t")
-				connection = true;
+				connection3 = true;
 			else
-				connection = false;
+				connection3 = false;
 	}
 
 	//}
@@ -606,13 +1189,18 @@ void MultipleObjects::addConnection(std::pair<btRigidBody*,btTransform> MassTran
 */
 }
 
+/*
+ * For reseting the system
+ */
 void	MultipleObjects::clientResetScene()
 {
 	exitPhysics();
 	Interface();
 }
 
-
+/*
+ * For destroying all the conserved memory locations
+ */
 void	MultipleObjects::exitPhysics()
 {
 
@@ -638,6 +1226,10 @@ void	MultipleObjects::exitPhysics()
 		btCollisionShape* shape = m_collisionShapes[j];
 		delete shape;
 	}
+	//TODO
+	//delete rigid body objects as well
+
+
 	m_collisionShapes.clear();
 
 	delete m_dynamicsWorld;
@@ -656,7 +1248,10 @@ void	MultipleObjects::exitPhysics()
 }
 
 
-
+//TODO
+// Feed Forward Connection
+// Recurrent Connection
+// Connection of own choice
 
 
 
