@@ -2,7 +2,7 @@
  * MultipleObjects.h
  *
  *  Created on: Aug 8, 2013
- *      Author: marium
+ *      Author: Marium Zeeshan
  */
 
 #ifndef MULTIPLEOBJECTS_H_
@@ -22,6 +22,9 @@
 #include <ctime>
 #include <cmath>
 #include <iomanip>
+#include <algorithm>
+#include <boost/bind.hpp>
+
 //#include "BackPropagation.h"
 
 
@@ -64,12 +67,14 @@ class MultipleObjects : public PlatformDemoApplication
 	{
 		_groundDimensions = {200.,20.,80.}; 	//default 200 X 20 X 80 initialization
 		_groundOrigin = {0.,-40.,0.};	//default 0 X -50 X 0 initialization
-		distMin_ = 1.;
-		distMax_ = 5.;
+		distMin_ = 1.; //for mass and position
+		distMax_ = 5.; //for mass and position
 		upperLimitofSpring = btVector3(5., 0., 0.);
 		lowerLimitofSpring = btVector3(-5., 0., 0.);
 		lowerAngularLimit = btVector3(0.f, 0.f, -1.5f);
 		upperAngularLimit = btVector3(0.f, 0.f, 1.5f);
+		springStiffness = 39.478f;
+		springDamping = 0.5f;
 	}
 
 	virtual ~MultipleObjects()
@@ -87,6 +92,10 @@ class MultipleObjects : public PlatformDemoApplication
 
 	void getResults(std::vector<std::pair<btRigidBody*,btTransform> > _massInformation);
 
+	double getSpringStiffnessConnectedbyMass(int _massNumber);
+
+	void setSpringStiffnessConnectedbyMass(int _massNumber,double stiffnessValue);
+
 	void setSimulationTime(double _time);
 
 	double getSimulationTime();
@@ -95,13 +104,17 @@ class MultipleObjects : public PlatformDemoApplication
 
 	void FreeMassSpringConnection(int NumberofMasses);
 
-	btScalar LinearForceOfSpring(double _springCurrentLength,double _springNeutralLength,double springStiffness);
+	btVector3 SubtractVector(const btVector3& v1, const btVector3& v2);
+
+	btVector3 LinearForceOfSpring(btVector3 _springCurrentLength,btVector3 _springNeutralLength,btScalar springStiffness);
+
+	Triplet LengthofSpring(double x,double y,double z);
 
 	void NonLinearForceOfSpring(void);
 
 	std::pair<btRigidBody*,btTransform> addMass(double x,double y,double z,double radius,bool fixed,bool activate);
 
-	void addConnection(std::pair<btRigidBody*,btTransform> MassTransformPair);
+	void addConnection(std::pair<btRigidBody*,btTransform> MassTransformPair,int massNumber);
 
 	void addGround();
 
@@ -122,6 +135,8 @@ class MultipleObjects : public PlatformDemoApplication
 	std::pair<btRigidBody*,btTransform> Initialization(double min,double max);
 
 	void setGravity(double y);
+
+	std::pair <btRigidBody*,btTransform> addBox(double height);
 
 	void FeedForwardMassSpringConnection(int NoOfMasses);
 
@@ -145,7 +160,7 @@ class MultipleObjects : public PlatformDemoApplication
 
 	void Training();
 
-	void ApplyLinearForce(void);
+	void ApplyLinearForce(int massNumber);
 
 	void ApplyNonlinearForce(void);
 
@@ -163,10 +178,46 @@ class MultipleObjects : public PlatformDemoApplication
 		return demo;
 	}
 
+	double getSpringStiffness() const
+	{
+		return springStiffness;
+	}
+
+	void setSpringStiffness(double springStiffness)
+	{
+		this->springStiffness = springStiffness;
+	}
+
+	double getSpringDamping() const
+	{
+		return springDamping;
+	}
+
+	void setSpringDamping(double springDamping)
+	{
+		this->springDamping = springDamping;
+	}
+
+	int getMode() const
+	{
+		return mode;
+	}
+
+	void setMode(int mode)
+	{
+		this->mode = mode;
+	}
+
 private:
 	std::vector<std::pair<btRigidBody*,btTransform> > masses;
 
 	btAlignedObjectArray<btCollisionShape*>	m_collisionShapes;
+
+	std::vector<std::pair<btVector3,double> >springEquilibriumPointandStiffness; //Rest points and stiffness of spring
+
+	std::vector<btVector3> fixedPoints; //Position of fixed points in feedforward network
+
+	std::vector<std::pair <int,int> > massMappingForFreeConnection;
 
 	double _timeStep;
 
@@ -177,6 +228,10 @@ private:
 	btVector3 lowerLimitofSpring;
 	btVector3 lowerAngularLimit;
 	btVector3 upperAngularLimit;
+	Triplet lengthofSpring;
+	double springStiffness;
+	double springDamping;
+	int mode;
 
 
 	double distMin_,
@@ -184,7 +239,7 @@ private:
 
 };
 
-#endif //BASIC_DEMO_H
+#endif //MULTIPLEOBJECTS_DEMO_H
 
 
 
